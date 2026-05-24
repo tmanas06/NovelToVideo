@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StoryToReel AI - Content Factory</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Sidebar Navigation -->
+        <nav id="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🎬</span>
+                <h2>StoryToReel <span class="badge-pro">AI</span></h2>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#dashboard" class="nav-link active" data-page="dashboard"><span class="icon">📊</span> Dashboard</a></li>
+                <li><a href="#create" class="nav-link" data-page="create"><span class="icon">🎥</span> Create Video</a></li>
+                <li><a href="#batch" class="nav-link" data-page="batch"><span class="icon">📦</span> Batch Generate</a></li>
+                <li><a href="#outputs" class="nav-link" data-page="outputs"><span class="icon">📁</span> Output Gallery</a></li>
+                <li><a href="#settings" class="nav-link" data-page="settings"><span class="icon">⚙️</span> Settings</a></li>
+            </ul>
+            <div class="system-status-widget" id="system-status-sidebar">
+                <div class="widget-header">System Health</div>
+                <div class="status-item"><span class="dot yellow" id="ollama-dot"></span> Ollama: <span id="ollama-text">checking...</span></div>
+                <div class="status-item"><span class="dot yellow" id="comfyui-dot"></span> ComfyUI: <span id="comfyui-text">checking...</span></div>
+                <div class="status-item"><span class="dot yellow" id="piper-dot"></span> TTS: <span id="piper-text">checking...</span></div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <header id="content-header">
+                <h1 id="page-title">Dashboard</h1>
+                <div id="header-actions"></div>
+            </header>
+
+            <section id="page-content">
+                <!-- Injected Pages by app.js -->
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Global Video Preview Modal -->
+    <div id="video-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="close-modal">&times;</span>
+            <h2 id="modal-video-title">Preview Output</h2>
+            <div class="video-container">
+                <video id="modal-video-player" controls autoplay>
+                    <source src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="modal-footer">
+                <a href="" id="modal-download-btn" class="btn primary" download>📥 Download MP4</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dependency Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
