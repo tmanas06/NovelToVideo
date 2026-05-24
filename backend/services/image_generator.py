@@ -16,10 +16,20 @@ settings = get_settings()
 def generate_placeholder_image(text: str, output_path: Path, width: int = 1080, height: int = 1920) -> Path:
     """Generates a beautiful gradient background image with overlaid scene text for robust fallbacks."""
     logger.info(f"Generating placeholder image for: {text[:30]}...")
-    # Create gradient background
-    base = Image.new('RGB', (width, height), color=(15, 15, 20))
-    top_color = (60, 20, 110)    # Deep purple
-    bottom_color = (15, 15, 20)  # Very dark slate
+    
+    # Deterministic colors based on text hash for variety
+    import hashlib
+    text_hash = int(hashlib.md5(text.encode()).hexdigest(), 16)
+    hue = text_hash % 360
+    
+    # Convert HSL to RGB for top color
+    import colorsys
+    rgb = colorsys.hls_to_rgb(hue / 360, 0.4, 0.7)
+    top_color = (int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
+    bottom_color = (15, 15, 20)  # Always keep dark bottom for consistency
+    
+    # Create base image
+    base = Image.new('RGB', (width, height), color=bottom_color)
     
     # Draw gradient
     draw = ImageDraw.Draw(base)
@@ -34,7 +44,7 @@ def generate_placeholder_image(text: str, output_path: Path, width: int = 1080, 
     # Draw decorative circles/glow
     glow = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    glow_draw.ellipse([width//4, height//3, width*3//4, height*2//3], fill=(124, 92, 252, 30))
+    glow_draw.ellipse([width//4, height//3, width*3//4, height*2//3], fill=(top_color[0], top_color[1], top_color[2], 40))
     base.paste(glow, mask=glow.split()[3])
     
     # Blur slightly for smooth glow
@@ -104,20 +114,30 @@ def generate_placeholder_image(text: str, output_path: Path, width: int = 1080, 
 async def generate_image(prompt: str, negative_prompt: str, output_path: Path, 
                          mode: str = 'comfyui', width: int = 1080, height: int = 1920,
                          comfyui_url: str = 'http://localhost:8188',
-                         api_url: str = '', api_key: str = '') -> Path:
+                         api_url: str = '', api_key: str = '',
+                         log_callback=None) -> Path:
     """Generates a scene image via ComfyUI, API or beautiful placeholder fallback."""
     if mode.lower() == 'placeholder':
+        if log_callback:
+            log_callback("info", f"[IMAGEGEN] Using placeholder generator for prompt snippet: {prompt[:30]}...")
         return generate_placeholder_image(prompt.split(",")[0], output_path, width, height)
 
     if mode.lower() == 'comfyui':
+        if log_callback:
+            log_callback("info", f"[COMFYUI] Requesting image generation at {comfyui_url}...")
         client_id = str(uuid.uuid4())
         # ComfyUI prompt API format
+        workflow = {
+            # ... (workflow dict remains the same)
+        }
+        
+        # Injecting actual workflow here (keeping previous code logic)
         workflow = {
             "3": {
                 "class_type": "KSampler",
                 "inputs": {
                     "seed": random.randint(1, 1000000000),
-                    "steps": 20,
+                    "steps": 14, # Optimized from 20 for faster laptop generation
                     "cfg": 7.0,
                     "sampler_name": "euler_ancestral",
                     "scheduler": "normal",
@@ -138,7 +158,7 @@ async def generate_image(prompt: str, negative_prompt: str, output_path: Path,
                 "class_type": "EmptyLatentImage",
                 "inputs": {
                     "width": 512,
-                    "height": 896,
+                    "height": 768, # Reduced from 896 for speed; still looks good vertical
                     "batch_size": 1
                 }
             },
@@ -179,14 +199,18 @@ async def generate_image(prompt: str, negative_prompt: str, output_path: Path,
                 if response.status_code == 200:
                     res_json = response.json()
                     prompt_id = res_json.get("prompt_id")
+                    if log_callback:
+                        log_callback("debug", f"[COMFYUI] Prompt queued. ID: {prompt_id}. Polling for results...")
                     
                     # Poll for completion
-                    for attempt in range(120): # Up to 10 minutes on CPU
-                        await asyncio.sleep(5)
+                    for attempt in range(300): # Up to 10 minutes, but check more frequently
+                        await asyncio.sleep(2) # Poll every 2 seconds instead of 5
                         history_response = await client.get(f"{comfyui_url.rstrip('/')}/history/{prompt_id}")
                         if history_response.status_code == 200:
                             history = history_response.json()
                             if prompt_id in history:
+                                if log_callback:
+                                    log_callback("success", f"[COMFYUI] Generation complete. Downloading image...")
                                 # Completed! Extract filename
                                 outputs = history[prompt_id].get("outputs", {})
                                 for node_id, node_output in outputs.items():
@@ -211,14 +235,24 @@ async def generate_image(prompt: str, negative_prompt: str, output_path: Path,
                                                     
                                                 temp_path.unlink()
                                                 logger.info(f"ComfyUI image generated successfully: {output_path}")
+                                                if log_callback:
+                                                    log_callback("success", f"[IMAGEGEN] Scene image saved and upscaled to 1080x1920.")
                                                 return output_path
+                        if attempt % 15 == 0 and log_callback: # Log every 30 seconds
+                            log_callback("debug", f"[COMFYUI] Still processing... (attempt {attempt})")
                 else:
                     err_body = response.text
                     logger.error(f"ComfyUI prompt failed (Status {response.status_code}): {err_body}")
+                    if log_callback:
+                        log_callback("error", f"[COMFYUI] Request failed ({response.status_code}): {err_body[:100]}...")
         except Exception as e:
             logger.error(f"Error communicating with ComfyUI: {e}")
+            if log_callback:
+                log_callback("error", f"[COMFYUI] Connection error: {str(e)}")
 
     elif mode.lower() == 'api' and api_url:
+        if log_callback:
+            log_callback("info", f"[IMAGEGEN] Calling external API: {api_url}...")
         # Fallback to an external API (e.g. HuggingFace, Stability AI, etc.)
         try:
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -233,11 +267,19 @@ async def generate_image(prompt: str, negative_prompt: str, output_path: Path,
                 if response.status_code == 200:
                     with open(output_path, "wb") as f:
                         f.write(response.content)
+                    if log_callback:
+                        log_callback("success", f"[IMAGEGEN] API image received and saved.")
                     return output_path
+                elif log_callback:
+                    log_callback("error", f"[IMAGEGEN] API returned {response.status_code}")
         except Exception as e:
             logger.error(f"Error calling external image API: {e}")
+            if log_callback:
+                log_callback("error", f"[IMAGEGEN] API connection failed: {str(e)}")
 
     # Solid fallback to placeholder
+    if log_callback:
+        log_callback("warning", f"[IMAGEGEN] Falling back to placeholder for scene.")
     return generate_placeholder_image(prompt.split(",")[0], output_path, width, height)
 
 async def generate_images_for_project(scenes: List[Dict[str, Any]], project_id: str, log_callback=None, **kwargs) -> List[Dict[str, Any]]:
@@ -256,7 +298,7 @@ async def generate_images_for_project(scenes: List[Dict[str, Any]], project_id: 
             neg_prompt = "blurry, low quality"
             
         if log_callback:
-            log_callback("info", f"Generating image for scene {scene_num} with prompt: {prompt[:50]}...")
+            log_callback("info", f"[PIPELINE] Starting image generation for scene {scene_num}...")
             
         output_path = img_dir / f"scene_{scene_num:02d}.png"
         
@@ -270,14 +312,11 @@ async def generate_images_for_project(scenes: List[Dict[str, Any]], project_id: 
             height=kwargs.get("video_height", settings.video_height),
             comfyui_url=kwargs.get("comfyui_url", settings.comfyui_url),
             api_url=kwargs.get("image_api_url", settings.image_api_url),
-            api_key=kwargs.get("image_api_key", settings.image_api_key)
+            api_key=kwargs.get("image_api_key", settings.image_api_key),
+            log_callback=log_callback
         )
         
-        if log_callback:
-            log_callback("success", f"Scene {scene_num} image ready: {final_path.name}")
-            
         updated_scene = scene.copy()
-        # Store path relative to project root or absolute, but let's store absolute
         updated_scene["image_path"] = str(final_path)
         updated_scenes.append(updated_scene)
         

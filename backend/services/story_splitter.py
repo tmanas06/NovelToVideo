@@ -8,8 +8,11 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-async def split_story(story_text: str, num_scenes: int = 5, ollama_url: str = 'http://localhost:11434', model: str = 'qwen2.5:3b') -> List[Dict[str, Any]]:
+async def split_story(story_text: str, num_scenes: int = 5, ollama_url: str = 'http://localhost:11434', model: str = 'qwen2.5:3b', log_callback=None) -> List[Dict[str, Any]]:
     """Uses Ollama to split a story into key visual scenes with narration."""
+    if log_callback:
+        log_callback("info", f"[OLLAMA] Requesting scene extraction using model '{model}'...")
+        
     prompt = f"""
     Split the following story into exactly {num_scenes} visual scenes for a video.
     For each scene, provide:
@@ -27,7 +30,9 @@ async def split_story(story_text: str, num_scenes: int = 5, ollama_url: str = 'h
     """
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            if log_callback:
+                log_callback("debug", f"[OLLAMA] Connecting to {ollama_url}/api/generate...")
             response = await client.post(
                 f"{ollama_url.rstrip('/')}/api/generate",
                 json={
@@ -37,7 +42,7 @@ async def split_story(story_text: str, num_scenes: int = 5, ollama_url: str = 'h
                     "format": "json"
                 }
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 content = result.get("response", "[]")
@@ -45,41 +50,59 @@ async def split_story(story_text: str, num_scenes: int = 5, ollama_url: str = 'h
                 scenes = json.loads(content)
                 # Validation
                 if isinstance(scenes, list) and len(scenes) > 0:
+                    logger.info(f"Successfully split story into {len(scenes)} scenes using Ollama.")
+                    if log_callback:
+                        log_callback("success", f"[OLLAMA] Successfully extracted {len(scenes)} scenes.")
                     return scenes[:num_scenes]
-            
-            logger.error(f"Ollama returned status {response.status_code}")
-            raise Exception("Invalid response from Ollama")
+                else:
+                    logger.warning(f"Ollama returned empty or invalid scene list: {content}")
+                    if log_callback:
+                        log_callback("warning", f"[OLLAMA] Model returned empty or invalid scene list.")
+                    raise Exception("Model returned empty or invalid scene list")
+            else:
+                logger.error(f"Ollama returned status {response.status_code}: {response.text}")
+                if log_callback:
+                    log_callback("error", f"[OLLAMA] API Error {response.status_code}: {response.text[:100]}...")
+                raise Exception(f"Ollama error: {response.status_code}")
 
     except Exception as e:
-        logger.error(f"Error calling Ollama story splitter: {e}")
+        logger.error(f"Error calling Ollama story splitter: {str(e)}")
+        if log_callback:
+            log_callback("warning", f"[OLLAMA] Splitter failed, using fallback heuristic: {str(e)}")
         # Fallback: Divide the entire story into N roughly equal chunks
-        logger.info(f"Using fallback chunking heuristic to split story into {num_scenes} scenes.")
-        
+        logger.info(f"Using enhanced fallback chunking heuristic to split story into {num_scenes} scenes.")
+
         # Clean text
         text = story_text.strip()
         words = text.split()
         if not words:
             return [{"scene_number": 1, "description": "Empty story", "narration_text": "No content provided."}]
-            
+
         chunk_size = len(words) // num_scenes
         if chunk_size == 0: chunk_size = 1
-        
+
         scenes = []
         for i in range(num_scenes):
             start_idx = i * chunk_size
             # Last chunk takes the rest
             end_idx = (i + 1) * chunk_size if i < num_scenes - 1 else len(words)
-            
+
             chunk_words = words[start_idx:end_idx]
             narration = " ".join(chunk_words)
-            
+
             if not narration:
                 continue
-                
+
+            # Enhanced fallback description: try to get a more descriptive visual prompt
+            # by taking a few key words from the start, middle and end of the chunk
+            snippet_length = 15
+            description_text = narration
+            if len(chunk_words) > snippet_length:
+                description_text = " ".join(chunk_words[:snippet_length])
+
             scenes.append({
                 "scene_number": i + 1,
-                "description": f"Visual representation of: {narration[:100]}...",
+                "description": f"Cinematic scene showing: {description_text}",
                 "narration_text": narration
             })
-            
         return scenes

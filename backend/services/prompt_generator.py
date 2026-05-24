@@ -15,14 +15,20 @@ STYLE_PRESETS = {
     "cinematic": "cinematic style, dramatic movie still, professional color grading, anamorphic lens flare, award-winning cinematography, highly detailed"
 }
 
-async def generate_prompts(scenes: List[Dict[str, Any]], style: str = 'manga', ollama_url: str = 'http://localhost:11434', model: str = 'qwen2.5:3b') -> List[Dict[str, Any]]:
+async def generate_prompts(scenes: List[Dict[str, Any]], style: str = 'manga', ollama_url: str = 'http://localhost:11434', model: str = 'qwen2.5:3b', log_callback=None) -> List[Dict[str, Any]]:
     """Converts a list of scene visual descriptions into highly detailed image generation prompts using Ollama."""
     style_preset = STYLE_PRESETS.get(style.lower(), STYLE_PRESETS["manga"])
     enhanced_scenes = []
 
+    if log_callback:
+        log_callback("info", f"[PROMPTER] Expanding {len(scenes)} scenes with style '{style}' via Ollama...")
+
     for scene in scenes:
         scene_num = scene.get("scene_number", 1)
         desc = scene.get("description", "")
+        
+        if log_callback:
+            log_callback("debug", f"[PROMPTER] Processing Scene {scene_num}: '{desc[:30]}...'")
         
         system_prompt = (
             f"You are an expert prompt engineer for generative AI models like Stable Diffusion.\n"
@@ -44,17 +50,33 @@ async def generate_prompts(scenes: List[Dict[str, Any]], style: str = 'manga', o
 
         image_prompt = ""
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(url, json=payload)
                 if response.status_code == 200:
                     result = response.json()
                     image_prompt = result.get("response", "").strip()
+                else:
+                    logger.error(f"Ollama prompt generator returned status {response.status_code}: {response.text}")
+                    if log_callback:
+                        log_callback("error", f"[PROMPTER] API error for scene {scene_num}: {response.status_code}")
         except Exception as e:
-            logger.error(f"Error calling Ollama prompt generator for scene {scene_num}: {e}")
+            logger.error(f"Error calling Ollama prompt generator for scene {scene_num}: {str(e)}")
+            if log_callback:
+                log_callback("warning", f"[PROMPTER] Scene {scene_num} expansion failed: {str(e)}")
 
         # Fallback if Ollama fails or is unreachable
         if not image_prompt:
-            image_prompt = f"{desc}, {style_preset}"
+            logger.info(f"Using fallback prompt for scene {scene_num}")
+            if log_callback:
+                log_callback("info", f"[PROMPTER] Scene {scene_num} using basic fallback.")
+            # Ensure the fallback is at least somewhat descriptive and includes the style
+            image_prompt = f"{desc}"
+            if "Cinematic scene showing:" not in image_prompt and "Visual representation of:" not in image_prompt:
+                 image_prompt = f"Cinematic visual of: {image_prompt}"
+            image_prompt = f"{image_prompt}, {style_preset}"
+        else:
+            if log_callback:
+                log_callback("success", f"[PROMPTER] Scene {scene_num} prompt expanded ({len(image_prompt)} chars).")
 
         # Clean prompt (remove markdown bold/quotes)
         image_prompt = image_prompt.replace('"', '').replace('**', '').replace('`', '').strip()

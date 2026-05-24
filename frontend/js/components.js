@@ -21,7 +21,7 @@ const Components = {
     emptyState(icon, message, actionText = '', actionHref = '') {
         return `
             <div style="text-align: center; padding: 48px 24px; border: 1px dashed var(--border-color); border-radius: var(--radius-lg); background-color: var(--bg-surface);">
-                <div style="font-size: 40px; margin-bottom: 16px;">${icon}</div>
+                <div style="font-size: 40px; margin-bottom: 16px;">[ ]</div>
                 <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 14px;">${message}</p>
                 ${actionText ? `<a href="${actionHref}" class="btn primary">${actionText}</a>` : ''}
             </div>
@@ -35,8 +35,8 @@ const Components = {
         if (timeInfo) {
             timeDisplay = `
                 <div style="display: flex; gap: 20px; margin-top: 8px; font-size: 11px; color: var(--text-secondary); font-weight: 500;">
-                    <span>⏱️ ELAPSED: <strong>${timeInfo.elapsed}</strong></span>
-                    ${timeInfo.remaining ? `<span>⏳ REMAINING: <strong>${timeInfo.remaining}</strong></span>` : ''}
+                    <span>ELAPSED: <strong>${timeInfo.elapsed}</strong></span>
+                    ${timeInfo.remaining ? `<span>REMAINING: <strong>${timeInfo.remaining}</strong></span>` : ''}
                 </div>
             `;
         }
@@ -70,11 +70,11 @@ const Components = {
             <div class="video-card" id="project-card-${project.id}">
                 <div class="video-thumbnail" onclick="${hasVideo ? `App.playVideo('${project.id}', '${project.title}')` : `location.hash='#create';`}" style="aspect-ratio: 9/16;">
                     ${hasVideo ? `
-                        <div class="play-overlay">▶</div>
+                        <div class="play-overlay">Play</div>
                         <div style="position: absolute; top: 12px; right: 12px; background-color: var(--success); color: white; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700;">READY</div>
                     ` : `
                         <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                            <span style="font-size: 40px; display: block; margin-bottom: 12px;">🎬</span>
+                            <span style="font-size: 40px; display: block; margin-bottom: 12px;">[ ]</span>
                             <span style="font-weight: 600; font-size: 13px;">${project.status.toUpperCase()}</span>
                         </div>
                     `}
@@ -90,11 +90,11 @@ const Components = {
                     </div>
                     <div class="video-card-actions">
                         ${hasVideo ? `
-                            <button class="btn primary" onclick="App.playVideo('${project.id}', '${project.title}')">▶ Play</button>
+                            <button class="btn primary" onclick="App.playVideo('${project.id}', '${project.title}')">Play</button>
                         ` : `
-                            <button class="btn secondary" onclick="App.resumeGeneration('${project.id}')">🔄 Resume</button>
+                            <button class="btn secondary" onclick="App.resumeGeneration('${project.id}')">Resume</button>
                         `}
-                        <button class="btn danger" onclick="App.confirmDelete('${project.id}', '${project.title}')">🗑️ Delete</button>
+                        <button class="btn danger" onclick="App.confirmDelete('${project.id}', '${project.title}')">Delete</button>
                     </div>
                 </div>
             </div>
@@ -108,10 +108,10 @@ const Components = {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         
-        let icon = 'ℹ️';
-        if (type === 'success') icon = '✅';
-        if (type === 'warning') icon = '⚠️';
-        if (type === 'error') icon = '❌';
+        let icon = 'INFO';
+        if (type === 'success') icon = 'OK';
+        if (type === 'warning') icon = 'WARN';
+        if (type === 'error') icon = 'ERR';
 
         toast.innerHTML = `
             <span>${icon}</span>
@@ -130,7 +130,7 @@ const Components = {
     fileUpload(id) {
         return `
             <div class="upload-dropzone" id="dropzone-${id}" onclick="document.getElementById('${id}').click();">
-                <span>📁</span>
+                <span>[ Upload ]</span>
                 <p style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Click to upload story text file</p>
                 <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Supports only plain text (.txt)</p>
                 <input type="file" id="${id}" accept=".txt" style="display: none;">
@@ -140,12 +140,12 @@ const Components = {
 
     styleSelector(selected = 'manga') {
         const options = [
-            { id: 'manga', name: '🎨 Manga (B&W High-Contrast Ink)' },
-            { id: 'anime', name: '🌸 Anime (Studio Ghibli/Vibrant)' },
-            { id: 'realistic', name: '📸 Realistic (8K Cinematic Photo)' },
-            { id: 'fantasy', name: '✨ Fantasy (Magical Glow Concept)' },
-            { id: 'dark', name: '🦇 Dark (Moody Noir Shadows)' },
-            { id: 'cinematic', name: '🎬 Cinematic (Dramatic Camera Grade)' }
+            { id: 'manga', name: 'Manga (B&W High-Contrast Ink)' },
+            { id: 'anime', name: 'Anime (Studio Ghibli/Vibrant)' },
+            { id: 'realistic', name: 'Realistic (8K Cinematic Photo)' },
+            { id: 'fantasy', name: 'Fantasy (Magical Glow Concept)' },
+            { id: 'dark', name: 'Dark (Moody Noir Shadows)' },
+            { id: 'cinematic', name: 'Cinematic (Dramatic Camera Grade)' }
         ];
 
         return `
@@ -172,7 +172,7 @@ const Components = {
             <div class="pipeline-steps" id="pipeline-steps-checklist">
                 ${steps.map(step => `
                     <div class="step-indicator" id="step-row-${step.id}">
-                        <div class="step-icon">○</div>
+                        <div class="step-icon"></div>
                         <div class="step-details">
                             <span class="step-title">${step.title}</span>
                             <span class="step-desc">${step.desc}</span>

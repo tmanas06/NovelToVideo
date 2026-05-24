@@ -187,7 +187,7 @@ const App = {
                     <span>Recent Content Factory Projects</span>
                     <a href="#outputs" style="color: var(--primary); font-size: 13px; text-decoration: none; font-weight: 600;">View All</a>
                 </div>
-                ${total === 0 ? Components.emptyState('📊', 'No projects created yet. Start by turning a story into a stunning vertical video!', 'Create Video', '#create') : `
+                ${total === 0 ? Components.emptyState(' ', 'No projects created yet. Start by turning a story into a stunning vertical video!', 'Create Video', '#create') : `
                     <div class="outputs-grid">
                         ${projects.slice(0, 4).map(p => Components.projectCard(p)).join('')}
                     </div>
@@ -222,7 +222,7 @@ const App = {
                     </div>
 
                     <div style="display: flex; gap: 16px; margin-top: 24px;">
-                        <button type="submit" class="btn primary" style="flex: 1;">🚀 Start Automated Pipeline</button>
+                        <button type="submit" class="btn primary" style="flex: 1;">Start Automated Pipeline</button>
                         <button type="reset" class="btn secondary">Reset</button>
                     </div>
                 </form>
@@ -245,15 +245,10 @@ const App = {
                         ${Components.pipelineStepsList()}
                     </div>
                     <div>
-                        <h4 style="margin-bottom: 12px;">Engine Console Logs</h4>
-                        <div class="logs-console" id="pipeline-console-logs">STORYTOREEL AI pipeline initialized. Waiting for tasks...\n</div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 28px;">
-                    <h4 style="margin-bottom: 12px;">Factory Terminal (Real-time Engine Output)</h4>
-                    <div class="engine-terminal" id="pipeline-engine-terminal">
-                        <div class="terminal-line"><span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> Factory engine standing by...</div>
+                        <h4 style="margin-bottom: 12px;">Factory Terminal (Real-time Engine Output)</h4>
+                        <div class="engine-terminal" id="pipeline-engine-terminal">
+                            <div class="terminal-line"><span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> Factory engine standing by...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -323,13 +318,12 @@ const App = {
         } catch (err) {
             Components.showToast(`Generation launch failed: ${err.message}`, 'error');
             submitBtn.disabled = false;
-            submitBtn.textContent = '🚀 Start Automated Pipeline';
+            submitBtn.textContent = 'Start Automated Pipeline';
         }
     },
 
     async monitorPipelineProgress(jobId, projectId) {
         const progressSlot = document.getElementById('pipeline-progress-slot');
-        const consoleLogs = document.getElementById('pipeline-console-logs');
         const engineTerminal = document.getElementById('pipeline-engine-terminal');
         const previewsSlot = document.getElementById('pipeline-previews-slot');
         const badgeSlot = document.getElementById('pipeline-status-badge');
@@ -398,8 +392,14 @@ const App = {
                 
                 // Write high-level checklist logs
                 if (message) {
-                    consoleLogs.innerHTML += `${message}\n`;
-                    consoleLogs.scrollTop = consoleLogs.scrollHeight;
+                    const time = new Date().toLocaleTimeString();
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'terminal-line';
+                    logEntry.innerHTML = `<span class="terminal-timestamp">${time}</span> <span class="terminal-info">[INFO]</span> ${message}`;
+                    if (engineTerminal) {
+                        engineTerminal.appendChild(logEntry);
+                        engineTerminal.scrollTop = engineTerminal.scrollHeight;
+                    }
                 }
                 
                 // Highlight step list
@@ -444,7 +444,7 @@ const App = {
                     badgeSlot.innerHTML = Components.statusBadge('completed');
                     document.querySelectorAll('.step-indicator').forEach(row => {
                         row.className = 'step-indicator completed';
-                        row.querySelector('.step-icon').textContent = '✓';
+                        row.querySelector('.step-icon').textContent = 'OK';
                     });
                     setTimeout(() => {
                         this.playVideo(projectId, 'Generation complete');
@@ -463,7 +463,18 @@ const App = {
                     const activeRow = document.querySelector('.step-indicator.active');
                     if (activeRow) {
                         activeRow.className = 'step-indicator';
-                        activeRow.querySelector('.step-icon').textContent = '❌';
+                        activeRow.querySelector('.step-icon').textContent = 'X';
+                    }
+
+                    // Add Retry Button if it doesn't exist
+                    if (!document.getElementById('retry-pipeline-btn')) {
+                        const retryBtn = document.createElement('button');
+                        retryBtn.id = 'retry-pipeline-btn';
+                        retryBtn.className = 'btn primary';
+                        retryBtn.style.marginTop = '20px';
+                        retryBtn.innerHTML = 'Try Again / Restart Pipeline';
+                        retryBtn.onclick = () => this.handleResetAndRetry(projectId);
+                        progressSlot.appendChild(retryBtn);
                     }
                 }
             } 
@@ -481,6 +492,34 @@ const App = {
                 }
             }
         });
+    },
+
+    async handleResetAndRetry(projectId) {
+        try {
+            Components.showToast('Re-initializing pipeline...', 'info');
+            
+            // 1. Reset UI
+            const monitor = document.getElementById('pipeline-monitor-panel');
+            const engineTerminal = document.getElementById('pipeline-engine-terminal');
+            const previewsSlot = document.getElementById('pipeline-previews-slot');
+            
+            engineTerminal.innerHTML = `<div class="terminal-line"><span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> Factory engine restarting...</div>`;
+            previewsSlot.innerHTML = '';
+            
+            // Remove retry button if it exists
+            const retryBtn = document.getElementById('retry-pipeline-btn');
+            if (retryBtn) retryBtn.remove();
+
+            // 2. Trigger video generation again
+            const job = await API.startGeneration(projectId);
+            Components.showToast('Task re-queued in worker thread.', 'success');
+            
+            // 3. Re-start monitoring
+            this.monitorPipelineProgress(job.id, projectId);
+            
+        } catch (err) {
+            Components.showToast(`Retry failed: ${err.message}`, 'error');
+        }
     },
 
 
@@ -514,8 +553,8 @@ const App = {
                 </div>
                 
                 <div style="display: flex; gap: 16px; margin-top: 24px;">
-                    <button class="btn secondary" onclick="App.addBatchSlot()">➕ Add Story</button>
-                    <button class="btn primary" onclick="App.submitBatchForm()">🚀 Submit Batch Queue</button>
+                    <button class="btn secondary" onclick="App.addBatchSlot()">Add Story</button>
+                    <button class="btn primary" onclick="App.submitBatchForm()">Submit Batch Queue</button>
                 </div>
             </div>
             
@@ -633,7 +672,7 @@ const App = {
         container.innerHTML = `
             <div class="card">
                 <div class="card-title">Completed MP4 Exports</div>
-                ${projects.length === 0 ? Components.emptyState('📁', 'No videos exported yet. Build one from the Create page!', 'Create Video', '#create') : `
+                ${projects.length === 0 ? Components.emptyState(' ', 'No videos exported yet. Build one from the Create page!', 'Create Video', '#create') : `
                     <div class="outputs-grid">
                         ${projects.map(p => Components.projectCard(p)).join('')}
                     </div>
