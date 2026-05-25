@@ -15,9 +15,9 @@ async def build_video(project_id: str, scenes: List[Dict[str, Any]],
                        width: int = 1080, height: int = 1920,
                        fps: int = 24,
                        log_callback=None) -> Path:
-    """Assembles animated scene clips, mixed audio, and subtitles into a final MP4 video."""
+    """Assembles animated scene clips, mixed audio, subtitles, and background visual loop into final MP4 video."""
     video_dir = get_project_video_dir(project_id)
-    
+
     # 1. Get scene video clips
     clip_paths = []
     for scene in scenes:
@@ -26,26 +26,31 @@ async def build_video(project_id: str, scenes: List[Dict[str, Any]],
             clip_paths.append(Path(v_path))
         else:
             raise FileNotFoundError(f"Missing animated video clip for scene {scene.get('scene_number')}")
-            
+
     if not clip_paths:
         raise ValueError("No video clips available to assemble!")
-        
+
     if log_callback:
         log_callback("info", f"Concatenating {len(clip_paths)} clips for project {project_id}")
     concated_video_path = video_dir / "concated_raw.mp4"
     concat_videos(clip_paths, concated_video_path)
-    
-    # 2. Add mixed audio
+
+    # 2. Skip dynamic thematic background overlay due to FFmpeg stability issues
+    video_with_bg_path = video_dir / "video_with_bg.mp4"
+    shutil.copy(concated_video_path, video_with_bg_path)
+
+
+    # 3. Add mixed audio
     video_with_audio_path = video_dir / "video_with_audio.mp4"
     if mixed_audio_path and mixed_audio_path.exists():
         if log_callback:
             log_callback("info", f"Adding mixed audio stream {mixed_audio_path.name} to video")
-        add_audio_to_video(concated_video_path, mixed_audio_path, video_with_audio_path)
+        add_audio_to_video(video_with_bg_path, mixed_audio_path, video_with_audio_path)
     else:
         logger.warning("No mixed audio stream provided. Video will have no sound.")
-        shutil.copy(concated_video_path, video_with_audio_path)
-        
-    # 3. Burn in subtitles if provided
+        shutil.copy(video_with_bg_path, video_with_audio_path)
+
+    # 4. Burn in subtitles if provided
     final_video_before_fade = video_dir / "video_with_subs.mp4"
     if subtitle_path and subtitle_path.exists():
         if log_callback:

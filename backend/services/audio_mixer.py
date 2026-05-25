@@ -40,30 +40,39 @@ async def concat_audio_files(audio_files: List[Path], output_path: Path) -> Path
             
     return output_path
 
-async def mix_audio(narration_path: Path, music_path: Path | None, output_path: Path,
-                    narration_volume: float = 1.0, music_volume: float = 0.15,
-                    fade_in: float = 1.0, fade_out: float = 2.0) -> Path:
-    """Mixes narration speech with royalty-free music and loops/ducks appropriately."""
+async def mix_audio(narration_path: Path, music_path: Path | None, background_audio_path: Path | None, output_path: Path,
+                    narration_volume: float = 1.0, music_volume: float = 0.15, background_volume: float = 0.1) -> Path:
+    """Mixes narration, background music, and ambient background audio."""
     if not narration_path.exists():
         raise FileNotFoundError(f"Narration file not found: {narration_path}")
         
-    if not music_path or not music_path.exists():
-        logger.warning("No music file provided or not found. Using pure narration audio.")
-        # Just adjust volume on narration
-        cmd = [
-            "ffmpeg", "-y", "-i", str(narration_path),
-            "-filter:a", f"volume={narration_volume}",
-            "-c:a", "aac", str(output_path)
-        ]
-        subprocess.run(cmd, check=True, capture_output=True)
-        return output_path
+    # Build filter complex for mixing
+    # Inputs: 0:narration, 1:music (optional), 2:background_audio (optional)
+    filter_complex = f"[0:a]volume={narration_volume}[n]"
+    inputs = ["-i", str(narration_path)]
+    mix_inputs = "[n]"
+    num_inputs = 1
+    
+    if music_path and music_path.exists():
+        inputs.extend(["-stream_loop", "-1", "-i", str(music_path)])
+        filter_complex += f";[{num_inputs}:a]volume={music_volume}[m]"
+        mix_inputs += "[m]"
+        num_inputs += 1
         
-    logger.info(f"Mixing narration {narration_path.name} with music {music_path.name} (vol: {music_volume})")
-    ffmpeg_mix_audio(
-        narration=narration_path,
-        music=music_path,
-        output=output_path,
-        narration_volume=narration_volume,
-        music_volume=music_volume
-    )
+    if background_audio_path and background_audio_path.exists():
+        inputs.extend(["-stream_loop", "-1", "-i", str(background_audio_path)])
+        filter_complex += f";[{num_inputs}:a]volume={background_volume}[b]"
+        mix_inputs += "[b]"
+        num_inputs += 1
+        
+    filter_complex += f";{mix_inputs}amix=inputs={num_inputs}:duration=first[out]"
+    
+    cmd = [
+        "ffmpeg", "-y"
+    ] + inputs + [
+        "-filter_complex", filter_complex,
+        "-map", "[out]", "-c:a", "pcm_s16le", str(output_path)
+    ]
+    
+    subprocess.run(cmd, check=True, capture_output=True)
     return output_path

@@ -66,21 +66,27 @@ const Components = {
         const hasVideo = project.status === 'completed';
         const imagePreset = project.style || 'manga';
         
+        // Find first scene with image
+        const sceneWithImage = project.scenes && project.scenes.find(s => s.image_path);
+        const imageUrl = sceneWithImage ? sceneWithImage.image_path.replace('/home/manas/Desktop/StoryToReel', '') : null;
+        
         return `
             <div class="video-card" id="project-card-${project.id}">
-                <div class="video-thumbnail" onclick="${hasVideo ? `App.playVideo('${project.id}', '${project.title}')` : `location.hash='#create';`}" style="aspect-ratio: 9/16;">
+                <div class="video-thumbnail" onclick="${hasVideo ? `App.playVideo('${project.id}', '${project.title}')` : `location.hash='#create';`}" style="aspect-ratio: 9/16; background-color: #1a1a1a; display: flex; align-items: center; justify-content: center;">
                     ${hasVideo ? `
                         <div class="play-overlay">Play</div>
                         <div style="position: absolute; top: 12px; right: 12px; background-color: var(--success); color: white; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700;">READY</div>
                     ` : `
                         <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                            <span style="font-size: 40px; display: block; margin-bottom: 12px;">[ ]</span>
-                            <span style="font-weight: 600; font-size: 13px;">${project.status.toUpperCase()}</span>
+                            <span style="font-size: 30px; display: block; margin-bottom: 8px;">Processing</span>
+                            <span style="font-weight: 600; font-size: 12px;">${project.status.toUpperCase()}</span>
                         </div>
                     `}
-                    ${project.scenes && project.scenes[0] && project.scenes[0].image_path ? `
-                        <img src="${project.scenes[0].image_path.replace('/home/manas/Desktop/StoryToReel', '')}" alt="first scene preview">
-                    ` : ''}
+                    ${imageUrl ? `
+                        <img src="${imageUrl}" alt="scene preview" style="width: 100%; height: 100%; object-fit: cover;">
+                    ` : `
+                        <div style="color: #333;">[ No Preview ]</div>
+                    `}
                 </div>
                 <div class="video-details">
                     <h3 class="video-card-title">${project.title}</h3>
@@ -142,9 +148,6 @@ const Components = {
         const options = [
             { id: 'manga', name: 'Manga (B&W High-Contrast Ink)' },
             { id: 'anime', name: 'Anime (Studio Ghibli/Vibrant)' },
-            { id: 'realistic', name: 'Realistic (8K Cinematic Photo)' },
-            { id: 'fantasy', name: 'Fantasy (Magical Glow Concept)' },
-            { id: 'dark', name: 'Dark (Moody Noir Shadows)' },
             { id: 'cinematic', name: 'Cinematic (Dramatic Camera Grade)' }
         ];
 

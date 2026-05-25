@@ -7,6 +7,9 @@ const App = {
     async init() {
         console.log('StoryToReel AI SPA initialized.');
         
+        // Start streaming logs
+        this.streamSystemLogs();
+        
         // Listen for hash changes
         window.addEventListener('hashchange', () => this.handleRouting());
         
@@ -35,6 +38,28 @@ const App = {
         // Perform initial system health check and schedule periodically
         this.checkSystemStatus();
         setInterval(() => this.checkSystemStatus(), 30000);
+    },
+
+    streamSystemLogs() {
+        // We use a small delay to ensure the terminal div exists when we try to connect
+        setTimeout(() => {
+            const engineTerminal = document.getElementById('pipeline-engine-terminal');
+            if (!engineTerminal) return;
+            
+            const eventSource = new EventSource('/api/logs/stream');
+            eventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'terminal-line';
+                    logEntry.innerHTML = `<span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> ${data.message}`;
+                    engineTerminal.appendChild(logEntry);
+                    engineTerminal.scrollTop = engineTerminal.scrollHeight;
+                } catch (err) {
+                    console.error('Error parsing log message:', err);
+                }
+            };
+        }, 1000);
     },
 
     handleRouting() {
@@ -160,7 +185,7 @@ const App = {
         const failed = projects.filter(p => p.status === 'failed').length;
         const processing = projects.filter(p => p.status === 'generating').length;
         
-        actions.innerHTML = `<a href="#create" class="btn primary">➕ Create New Video</a>`;
+        actions.innerHTML = `<a href="#create" class="btn primary">Create New Video</a>`;
 
         container.innerHTML = `
             <div class="dashboard-grid">
@@ -187,9 +212,9 @@ const App = {
                     <span>Recent Content Factory Projects</span>
                     <a href="#outputs" style="color: var(--primary); font-size: 13px; text-decoration: none; font-weight: 600;">View All</a>
                 </div>
-                ${total === 0 ? Components.emptyState(' ', 'No projects created yet. Start by turning a story into a stunning vertical video!', 'Create Video', '#create') : `
+                ${projects.filter(p => p.status !== 'failed').length === 0 ? Components.emptyState(' ', 'No recent successful projects. Create your first video!', 'Create Video', '#create') : `
                     <div class="outputs-grid">
-                        ${projects.slice(0, 4).map(p => Components.projectCard(p)).join('')}
+                        ${projects.filter(p => p.status !== 'failed').slice(0, 4).map(p => Components.projectCard(p)).join('')}
                     </div>
                 `}
             </div>

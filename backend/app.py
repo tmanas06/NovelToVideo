@@ -6,13 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from backend.utils.log_handler import log_queue, QueueHandler
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(Path("/home/manas/Desktop/StoryToReel/temp/app.log"), mode="a")
+        logging.FileHandler(Path("/home/manas/Desktop/StoryToReel/temp/app.log"), mode="a"),
+        QueueHandler(log_queue)
     ]
 )
 logger = logging.getLogger(__name__)
@@ -20,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Import DB and Queue managers
 from backend.database.db import db_manager
 from backend.workers.queue_manager import job_queue
-from backend.routes import projects, generation, batch, settings, sse
+from backend.routes import projects, generation, batch, settings, sse, logs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,6 +64,7 @@ app.include_router(generation.router)
 app.include_router(batch.router)
 app.include_router(settings.router)
 app.include_router(sse.router)
+app.include_router(logs.router)
 
 # Mount outputs and temp directories for viewing assets
 outputs_dir = Path("/home/manas/Desktop/StoryToReel/outputs")

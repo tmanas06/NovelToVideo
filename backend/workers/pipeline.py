@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from pathlib import Path
 from typing import Callable
 from backend.config import get_settings
@@ -12,6 +13,7 @@ from backend.services.animation_engine import create_all_animated_clips
 from backend.services.subtitle_generator import generate_ass
 from backend.services.audio_mixer import concat_audio_files, mix_audio
 from backend.services.video_builder import build_video
+from backend.utils.ffmpeg_utils import concat_videos
 from backend.utils.file_utils import get_project_audio_dir, get_project_video_dir, get_output_path
 
 logger = logging.getLogger(__name__)
@@ -29,11 +31,41 @@ async def run_pipeline(project_id: str, job_id: str, progress_callback: Callable
         log(f"--- Pipeline started for project {project_id} ---")
 
         # 1. Fetch project
-        progress_callback("loading_project", 0.05, "Fetching project data from database...")
-        log("Fetching project data from DB...")
+        progress_callback("loading_project", 0.05, "Fetching project data and preparing background assets...")
+        log("Fetching project data from DB and selecting background assets...")
         project = await get_project(project_id)
         if not project:
             raise ValueError(f"Project with ID {project_id} not found in database.")
+
+        # Asset selection
+        visuals_dir = Path("/home/manas/Desktop/StoryToReel/assets/backgrounds/visuals")
+        audio_dir = Path("/home/manas/Desktop/StoryToReel/assets/backgrounds/audio")
+        
+        visual_files = list(visuals_dir.glob("*.mp4"))
+        audio_files = list(audio_dir.glob("*.mp3")) + list(audio_dir.glob("*.wav"))
+        
+        # Select multiple to cover duration
+        selected_visuals = random.sample(visual_files, min(len(visual_files), 3)) if visual_files else []
+        selected_audios = random.sample(audio_files, min(len(audio_files), 3)) if audio_files else []
+        
+        # Concatenate assets
+        audio_dir_path = get_project_audio_dir(project_id)
+        video_dir_path = get_project_video_dir(project_id)
+        
+        combined_audio = audio_dir_path / "combined_bg_audio.wav"
+        combined_video = video_dir_path / "combined_bg_video.mp4"
+        
+        if selected_audios:
+            await concat_audio_files(selected_audios, combined_audio)
+        else:
+            combined_audio = None
+            
+        if selected_visuals:
+            concat_videos(selected_visuals, combined_video)
+        else:
+            combined_video = None
+        
+        log(f"Concatenated {len(selected_visuals)} visuals and {len(selected_audios)} audios for background.")
 
         title = project["title"]
         story_text = project["story_text"]
@@ -168,6 +200,7 @@ async def run_pipeline(project_id: str, job_id: str, progress_callback: Callable
         await mix_audio(
             narration_path=concated_audio,
             music_path=selected_music,
+            background_audio_path=combined_audio,
             output_path=mixed_audio,
             narration_volume=settings.narration_volume,
             music_volume=settings.bg_music_volume

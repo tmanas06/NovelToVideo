@@ -9,9 +9,6 @@ settings = get_settings()
 STYLE_PRESETS = {
     "manga": "manga style, detailed ink drawing, black and white with dramatic shading, high contrast, Japanese manga art, graphic novel visual",
     "anime": "anime style, vibrant colors, detailed character design, Studio Ghibli quality, beautiful fantasy lighting, masterwork anime key visual",
-    "realistic": "photorealistic, cinematic photography, 8k resolution, intricate details, highly professional lighting, dramatic atmosphere, photo",
-    "fantasy": "fantasy art style, magical atmosphere, ethereal glow, detailed mystical environment, epic landscape composition, fantasy concept art",
-    "dark": "dark gothic art style, moody atmosphere, deep shadows, dramatic contrast, noir aesthetic, dark fantasy theme",
     "cinematic": "cinematic style, dramatic movie still, professional color grading, anamorphic lens flare, award-winning cinematography, highly detailed"
 }
 
@@ -33,7 +30,9 @@ async def generate_prompts(scenes: List[Dict[str, Any]], style: str = 'manga', o
         system_prompt = (
             f"You are an expert prompt engineer for generative AI models like Stable Diffusion.\n"
             f"Your job is to expand the given visual scene description into a highly detailed, descriptive, single-paragraph prompt optimized for generating a high-quality vertical portrait image (9:16 aspect ratio).\n"
-            f"Focus on styling, subject, action, composition, camera shot type, lighting, textures, and color. Include the following style direction: {style_preset}.\n"
+            f"STYLE DIRECTION: {style_preset}.\n"
+            f"CHARACTER CONSISTENCY (Manga): Always include this description of the main character to ensure consistency in every scene: 'a young male protagonist with sharp facial features, determined eyes, wearing traditional cultivation robes in shades of blue and white, simple yet elegant design'.\n"
+            f"Focus on styling, subject, action, composition, camera shot type, lighting, textures, and color.\n"
             f"Output ONLY the prompt text, with no preamble, formatting, quotes, or conversational notes."
         )
 
@@ -47,11 +46,13 @@ async def generate_prompts(scenes: List[Dict[str, Any]], style: str = 'manga', o
                 "temperature": 0.6
             }
         }
-
+        logger.info(f"Sending prompt request to Ollama for scene {scene_num}. URL: {url}, Model: {model}")
+        
         image_prompt = ""
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=300.0) as client:
                 response = await client.post(url, json=payload)
+                logger.info(f"Ollama response received for scene {scene_num}. Status: {response.status_code}")
                 if response.status_code == 200:
                     result = response.json()
                     image_prompt = result.get("response", "").strip()
