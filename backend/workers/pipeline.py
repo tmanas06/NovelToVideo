@@ -3,7 +3,7 @@ import logging
 import random
 from pathlib import Path
 from typing import Callable
-from backend.config import get_settings
+from backend.config import get_settings, PROJECT_ROOT
 from backend.database.db import get_project, create_scene, get_scenes, update_scene
 from backend.services.story_splitter import split_story
 from backend.services.prompt_generator import generate_prompts
@@ -38,8 +38,8 @@ async def run_pipeline(project_id: str, job_id: str, progress_callback: Callable
             raise ValueError(f"Project with ID {project_id} not found in database.")
 
         # Asset selection
-        visuals_dir = Path("/home/manas/Desktop/StoryToReel/assets/backgrounds/visuals")
-        audio_dir = Path("/home/manas/Desktop/StoryToReel/assets/backgrounds/audio")
+        visuals_dir = PROJECT_ROOT / "assets" / "backgrounds" / "visuals"
+        audio_dir = PROJECT_ROOT / "assets" / "backgrounds" / "audio"
         
         visual_files = list(visuals_dir.glob("*.mp4"))
         audio_files = list(audio_dir.glob("*.mp3")) + list(audio_dir.glob("*.wav"))
@@ -170,7 +170,7 @@ async def run_pipeline(project_id: str, job_id: str, progress_callback: Callable
         subtitle_path = sub_dir / "subtitles.ass"
 
         # Download font if not present / select available system font
-        font_path = Path("/home/manas/Desktop/StoryToReel/assets/fonts/Inter-Bold.ttf")
+        font_path = PROJECT_ROOT / "assets" / "fonts" / "Inter-Bold.ttf"
         font_name = "Inter" if font_path.exists() else "DejaVu Sans"
 
         generate_ass(
@@ -193,7 +193,7 @@ async def run_pipeline(project_id: str, job_id: str, progress_callback: Callable
         await concat_audio_files(narration_files, concated_audio)
 
         # Check for background music in assets/music/
-        music_dir = Path("/home/manas/Desktop/StoryToReel/assets/music")
+        music_dir = PROJECT_ROOT / "assets" / "music"
         music_tracks = list(music_dir.glob("*.mp3")) + list(music_dir.glob("*.wav"))
         selected_music = music_tracks[0] if music_tracks else None
 

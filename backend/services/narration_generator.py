@@ -4,7 +4,7 @@ import shutil
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Any
-from backend.config import get_settings
+from backend.config import get_settings, PROJECT_ROOT
 from backend.utils.file_utils import get_project_audio_dir
 from backend.utils.ffmpeg_utils import get_duration
 
@@ -18,13 +18,13 @@ async def generate_narration(text: str, output_path: Path, voice: str = 'en_US-l
     # Check if Piper is installed
     piper_bin = shutil.which("piper")
     # Path to voice model
-    voice_dir = Path("/home/manas/Desktop/StoryToReel/assets/voices")
+    voice_dir = PROJECT_ROOT / "assets" / "voices"
     voice_dir.mkdir(parents=True, exist_ok=True)
     voice_model_path = voice_dir / f"{voice}.onnx"
     
     # Check for local virtualenv piper binary
     if not piper_bin:
-        local_piper = Path("/home/manas/Desktop/StoryToReel/venv/bin/piper")
+        local_piper = PROJECT_ROOT / "venv" / "bin" / "piper"
         if local_piper.exists():
             piper_bin = str(local_piper)
             

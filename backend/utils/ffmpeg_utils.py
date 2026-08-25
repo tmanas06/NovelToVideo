@@ -123,33 +123,33 @@ def create_ken_burns_video(image: Path, output: Path, duration: float, fps: int 
     inter_w = int(width * 1.2)
     inter_h = int(height * 1.2)
     
-    # Scale expressions for camera movement
+    # Scale expressions for camera movement (more aggressive)
     if effect == 'zoom_in':
-        zoom_expr = f"min(1.2,zoom+0.1/{total_frames})"
+        zoom_expr = f"min(1.4,zoom+0.2/{total_frames})"
         x_expr = "iw/2-(iw/zoom/2)"
         y_expr = "ih/2-(ih/zoom/2)"
     elif effect == 'zoom_out':
-        zoom_expr = f"max(1.0,1.2-0.1*on/{total_frames})"
+        zoom_expr = f"max(1.0,1.4-0.2*on/{total_frames})"
         x_expr = "iw/2-(iw/zoom/2)"
         y_expr = "ih/2-(ih/zoom/2)"
     elif effect == 'pan_left':
-        zoom_expr = "1.1"
+        zoom_expr = "1.3"
         x_expr = f"max(0,(iw-iw/zoom)*(1-on/{total_frames}))"
         y_expr = "ih/2-(ih/zoom/2)"
     elif effect == 'pan_right':
-        zoom_expr = "1.1"
+        zoom_expr = "1.3"
         x_expr = f"(iw-iw/zoom)*on/{total_frames}"
         y_expr = "ih/2-(ih/zoom/2)"
     elif effect == 'pan_up':
-        zoom_expr = "1.1"
+        zoom_expr = "1.3"
         x_expr = "iw/2-(iw/zoom/2)"
         y_expr = f"max(0,(ih-ih/zoom)*(1-on/{total_frames}))"
     elif effect == 'pan_down':
-        zoom_expr = "1.1"
+        zoom_expr = "1.3"
         x_expr = "iw/2-(iw/zoom/2)"
         y_expr = f"(ih-ih/zoom)*on/{total_frames}"
-    else: # Default subtle zoom
-        zoom_expr = f"min(1.1,zoom+0.05/{total_frames})"
+    else: # Default intense zoom
+        zoom_expr = f"min(1.3,zoom+0.1/{total_frames})"
         x_expr = "iw/2-(iw/zoom/2)"
         y_expr = "ih/2-(ih/zoom/2)"
 

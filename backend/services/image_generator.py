@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from typing import List, Dict, Any
-from backend.config import get_settings
+from backend.config import get_settings, PROJECT_ROOT
 from backend.utils.file_utils import get_project_images_dir
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def generate_placeholder_image(text: str, output_path: Path, width: int = 1080, 
     draw.rectangle([20, 20, width-20, height-20], outline=(124, 92, 252, 60), width=4)
     
     # Draw text
-    font_path = Path("/home/manas/Desktop/StoryToReel/assets/fonts/Inter-Bold.ttf")
+    font_path = PROJECT_ROOT / "assets" / "fonts" / "Inter-Bold.ttf"
     if not font_path.exists():
         font_path = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf") # Fallback Linux font
         
@@ -203,43 +203,57 @@ async def generate_image(prompt: str, negative_prompt: str, output_path: Path,
                         log_callback("debug", f"[COMFYUI] Prompt queued. ID: {prompt_id}. Polling for results...")
                     
                     # Poll for completion
-                    for attempt in range(300): # Up to 10 minutes, but check more frequently
-                        await asyncio.sleep(2) # Poll every 2 seconds instead of 5
-                        history_response = await client.get(f"{comfyui_url.rstrip('/')}/history/{prompt_id}")
-                        if history_response.status_code == 200:
-                            history = history_response.json()
-                            if prompt_id in history:
-                                if log_callback:
-                                    log_callback("success", f"[COMFYUI] Generation complete. Downloading image...")
-                                # Completed! Extract filename
-                                outputs = history[prompt_id].get("outputs", {})
-                                for node_id, node_output in outputs.items():
-                                    if "images" in node_output:
-                                        for img_info in node_output["images"]:
-                                            filename = img_info.get("filename")
-                                            subfolder = img_info.get("subfolder", "")
-                                            # Download image
-                                            view_url = f"{comfyui_url.rstrip('/')}/view?filename={filename}&subfolder={subfolder}&type=output"
-                                            img_data_res = await client.get(view_url)
-                                            if img_data_res.status_code == 200:
-                                                # Save temp image
-                                                temp_path = output_path.parent / f"temp_{output_path.name}"
-                                                with open(temp_path, "wb") as f:
-                                                    f.write(img_data_res.content)
-                                                
-                                                # Upscale/Resize to 1080x1920
-                                                with Image.open(temp_path) as img:
-                                                    resized_img = img.resize((width, height), Image.Resampling.LANCZOS)
-                                                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                                                    resized_img.save(output_path, "PNG")
+                    for attempt in range(300): # Up to 10 minutes
+                        await asyncio.sleep(2) # Poll every 2 seconds
+                        try:
+                            history_response = await client.get(f"{comfyui_url.rstrip('/')}/history/{prompt_id}", timeout=10.0)
+                            if history_response.status_code == 200:
+                                history = history_response.json()
+                                if prompt_id in history:
+                                    if log_callback:
+                                        log_callback("success", f"[COMFYUI] Generation complete. Downloading image...")
+                                    # Completed! Extract filename
+                                    outputs = history[prompt_id].get("outputs", {})
+                                    for node_id, node_output in outputs.items():
+                                        if "images" in node_output:
+                                            for img_info in node_output["images"]:
+                                                filename = img_info.get("filename")
+                                                subfolder = img_info.get("subfolder", "")
+                                                # Download image
+                                                view_url = f"{comfyui_url.rstrip('/')}/view?filename={filename}&subfolder={subfolder}&type=output"
+                                                img_data_res = await client.get(view_url)
+                                                if img_data_res.status_code == 200:
+                                                    # Save temp image
+                                                    temp_path = output_path.parent / f"temp_{output_path.name}"
+                                                    with open(temp_path, "wb") as f:
+                                                        f.write(img_data_res.content)
                                                     
-                                                temp_path.unlink()
-                                                logger.info(f"ComfyUI image generated successfully: {output_path}")
-                                                if log_callback:
-                                                    log_callback("success", f"[IMAGEGEN] Scene image saved and upscaled to 1080x1920.")
-                                                return output_path
-                        if attempt % 15 == 0 and log_callback: # Log every 30 seconds
-                            log_callback("debug", f"[COMFYUI] Still processing... (attempt {attempt})")
+                                                    # Upscale/Resize to 1080x1920
+                                                    with Image.open(temp_path) as img:
+                                                        resized_img = img.resize((width, height), Image.Resampling.LANCZOS)
+                                                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                                                        resized_img.save(output_path, "PNG")
+                                                        
+                                                    temp_path.unlink()
+                                                    logger.info(f"ComfyUI image generated successfully: {output_path}")
+                                                    if log_callback:
+                                                        log_callback("success", f"[IMAGEGEN] Scene image saved and upscaled to 1080x1920.")
+                                                    return output_path
+                                else:
+                                    if attempt % 15 == 0 and log_callback:
+                                        log_callback("debug", f"[COMFYUI] Still processing... (attempt {attempt})")
+                            else:
+                                if log_callback:
+                                    log_callback("warning", f"[COMFYUI] History check returned {history_response.status_code}")
+                        except Exception as poll_e:
+                            if log_callback:
+                                log_callback("warning", f"[COMFYUI] Poll error: {str(poll_e)}")
+                                
+                    else: # Loop ended without completion
+                         if log_callback:
+                            log_callback("error", f"[COMFYUI] Generation timed out.")
+                            raise Exception("ComfyUI generation timed out.")
+
                 else:
                     err_body = response.text
                     logger.error(f"ComfyUI prompt failed (Status {response.status_code}): {err_body}")

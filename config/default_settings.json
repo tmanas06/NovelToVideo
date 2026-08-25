@@ -2,7 +2,7 @@
   "ollama_url": "http://localhost:11434",
   "ollama_model": "qwen2.5:3b",
   "comfyui_url": "http://localhost:8188",
-  "image_mode": "comfyui",
+  "image_mode": "placeholder",
   "image_api_url": "",
   "image_api_key": "",
   "tts_voice": "en_US-lessac-medium",

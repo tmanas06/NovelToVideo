@@ -76,7 +76,7 @@ async def api_get_system_status():
     # 3. Check Piper TTS
     piper_bin = shutil.which("piper")
     if not piper_bin:
-        local_piper = Path("/home/manas/Desktop/StoryToReel/venv/bin/piper")
+        local_piper = PROJECT_ROOT / "venv" / "bin" / "piper"
         if local_piper.exists():
             piper_bin = str(local_piper)
             
@@ -84,7 +84,7 @@ async def api_get_system_status():
         status_report["piper_tts"]["available"] = True
         status_report["piper_tts"]["binary"] = piper_bin
         
-    voice_path = Path(f"/home/manas/Desktop/StoryToReel/assets/voices/{settings.tts_voice}.onnx")
+    voice_path = PROJECT_ROOT / "assets" / "voices" / f"{settings.tts_voice}.onnx"
     if voice_path.exists():
         status_report["piper_tts"]["voice_model"] = True
         

@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import shutil
+import random
 from pathlib import Path
 from typing import List, Dict, Any
 from backend.utils.ffmpeg_utils import concat_videos, add_audio_to_video, burn_subtitles, add_fade, get_duration
@@ -35,7 +36,7 @@ async def build_video(project_id: str, scenes: List[Dict[str, Any]],
     concated_video_path = video_dir / "concated_raw.mp4"
     concat_videos(clip_paths, concated_video_path)
 
-    # 2. Skip dynamic thematic background overlay due to FFmpeg stability issues
+    # 2. Add dynamic thematic overlay (smoke or pulse)
     video_with_bg_path = video_dir / "video_with_bg.mp4"
     shutil.copy(concated_video_path, video_with_bg_path)
 

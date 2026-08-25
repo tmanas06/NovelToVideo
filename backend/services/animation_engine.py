@@ -2,7 +2,7 @@ import random
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
-from backend.config import get_settings
+from backend.config import get_settings, PROJECT_ROOT
 from backend.utils.file_utils import get_project_video_dir
 from backend.utils.ffmpeg_utils import create_ken_burns_video
 
@@ -56,7 +56,7 @@ async def create_all_animated_clips(scenes: List[Dict[str, Any]], project_id: st
         if not image_path_str:
             logger.error(f"Cannot animate scene {scene_num}: Image path is missing!")
             # Save a placeholder image first
-            img_dir = Path("/home/manas/Desktop/StoryToReel/temp") / project_id / "images" / f"scene_{scene_num:02d}.png"
+            img_dir = PROJECT_ROOT / "temp" / project_id / "images" / f"scene_{scene_num:02d}.png"
             from backend.services.image_generator import generate_placeholder_image
             generate_placeholder_image(scene.get("description", "A dramatic moment"), img_dir, width, height)
             image_path_str = str(img_dir)

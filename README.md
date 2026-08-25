@@ -47,7 +47,7 @@ chmod +x scripts/setup.sh
 To start the uvicorn development server:
 ```bash
 source venv/bin/activate
-uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload --reload-exclude "temp/*" --reload-exclude "outputs/*"
 ```
 Open your browser and navigate to: **[http://localhost:8000](http://localhost:8000)**
 
@@ -58,4 +58,3 @@ Open your browser and navigate to: **[http://localhost:8000](http://localhost:80
 Since you are running on integrated Intel Iris Xe graphics (7GB RAM), configurations are optimized by default:
 - **Low RAM sequential execution**: Background jobs are scheduled one-by-one sequentially to avoid RAM overflow.
 - **Dynamic Image modes**: Local ComfyUI image generation (using Stable Diffusion 1.5) will run fine but is slow on CPUs (2-5 minutes per image). You can toggle **API Mode** or **Pillow Placeholder Mode** (gorgeous dark gradients) in the Settings tab to test/generate fast videos in seconds!
-# NovelToVideo

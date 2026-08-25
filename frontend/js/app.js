@@ -43,18 +43,23 @@ const App = {
     streamSystemLogs() {
         // We use a small delay to ensure the terminal div exists when we try to connect
         setTimeout(() => {
-            const engineTerminal = document.getElementById('pipeline-engine-terminal');
-            if (!engineTerminal) return;
-            
             const eventSource = new EventSource('/api/logs/stream');
             eventSource.onmessage = (e) => {
                 try {
                     const data = JSON.parse(e.data);
-                    const logEntry = document.createElement('div');
-                    logEntry.className = 'terminal-line';
-                    logEntry.innerHTML = `<span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> ${data.message}`;
-                    engineTerminal.appendChild(logEntry);
-                    engineTerminal.scrollTop = engineTerminal.scrollHeight;
+                    
+                    // Try to find either terminal, depending on which page we are on
+                    const mainTerminal = document.getElementById('pipeline-engine-terminal');
+                    const shortsTerminal = document.getElementById('shorts-engine-terminal');
+                    const targetTerminal = mainTerminal || shortsTerminal;
+                    
+                    if (targetTerminal) {
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'terminal-line';
+                        logEntry.innerHTML = `<span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> ${data.message}`;
+                        targetTerminal.appendChild(logEntry);
+                        targetTerminal.scrollTop = targetTerminal.scrollHeight;
+                    }
                 } catch (err) {
                     console.error('Error parsing log message:', err);
                 }
@@ -66,17 +71,21 @@ const App = {
         const hash = window.location.hash || '#dashboard';
         const page = hash.substring(1);
         
+        // Ensure page is one of the valid routes, otherwise default to dashboard
+        const validPages = ['dashboard', 'create', 'shorts', 'batch', 'outputs', 'shorts-gallery', 'settings'];
+        const targetPage = validPages.includes(page) ? page : 'dashboard';
+
         // Set active navigation link
         document.querySelectorAll('.nav-link').forEach(link => {
-            if (link.getAttribute('data-page') === page) {
+            if (link.getAttribute('data-page') === targetPage) {
                 link.classList.add('active');
             } else {
                 link.classList.remove('active');
             }
         });
         
-        this.currentPage = page;
-        this.renderPage(page);
+        this.currentPage = targetPage;
+        this.renderPage(targetPage);
     },
 
     async checkSystemStatus() {
@@ -152,12 +161,18 @@ const App = {
             } else if (page === 'create') {
                 title.textContent = 'Create New Reel/Short';
                 await this.renderCreatePage(content);
+            } else if (page === 'shorts') {
+                title.textContent = 'Create Shorts';
+                await this.renderShortsPage(content);
             } else if (page === 'batch') {
                 title.textContent = 'Batch Process stories';
                 await this.renderBatchPage(content);
             } else if (page === 'outputs') {
                 title.textContent = 'Generated Exports';
                 await this.renderOutputsPage(content);
+            } else if (page === 'shorts-gallery') {
+                title.textContent = 'Shorts Gallery';
+                await this.renderShortsGalleryPage(content);
             } else if (page === 'settings') {
                 title.textContent = 'Pipeline Configuration';
                 await this.renderSettingsPage(content);
@@ -217,6 +232,36 @@ const App = {
                         ${projects.filter(p => p.status !== 'failed').slice(0, 4).map(p => Components.projectCard(p)).join('')}
                     </div>
                 `}
+            </div>
+        `;
+    },
+
+    async renderShortsPage(container) {
+        console.log("Rendering Shorts Page...");
+        container.innerHTML = `
+            <div class="card" id="shorts-form-container">
+                <div class="card-title">Short Video Generator</div>
+                <form id="create-short-form" onsubmit="App.handleCreateShortSubmit(event)">
+                    <div class="form-group">
+                        <label for="short-prompt">Video Scene Description</label>
+                        <textarea id="short-prompt" class="form-control" placeholder="e.g. A cat eating korean mukbang on a round table, another cat disturbs" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="short-duration">Duration (seconds)</label>
+                        <input type="number" id="short-duration" class="form-control" value="15" min="5" max="30" required>
+                    </div>
+                    <button type="submit" class="btn primary">Generate Short</button>
+                </form>
+            </div>
+
+            <!-- Monitoring Panel -->
+            <div class="card" id="shorts-monitor-panel" style="display: none;">
+                <div class="card-title">
+                    <span>Generation Terminal</span>
+                </div>
+                <div class="engine-terminal" id="shorts-engine-terminal">
+                    <div class="terminal-line"><span class="terminal-timestamp">${new Date().toLocaleTimeString()}</span> <span class="terminal-info">[SYSTEM]</span> Shorts engine standing by...</div>
+                </div>
             </div>
         `;
     },
@@ -285,7 +330,7 @@ const App = {
                 </div>
             </div>
         `;
-
+        
         // Handle file uploader change
         const fileInput = document.getElementById('file-uploader');
         const textInput = document.getElementById('story-text');
@@ -304,6 +349,56 @@ const App = {
                 };
                 reader.readAsText(file);
             };
+        }
+    },
+
+    async renderShortsGalleryPage(container) {
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-title">Shorts Gallery</div>
+                <p>Your generated shorts will appear here.</p>
+            </div>
+        `;
+    },
+
+    async handleCreateShortSubmit(e) {
+        e.preventDefault();
+        
+        const prompt = document.getElementById('short-prompt').value.trim();
+        const duration = parseInt(document.getElementById('short-duration').value);
+        
+        if (!prompt) {
+            Components.showToast('Please enter a description', 'error');
+            return;
+        }
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Generating...';
+        
+        // Show terminal
+        document.getElementById('shorts-form-container').style.display = 'none';
+        document.getElementById('shorts-monitor-panel').style.display = 'block';
+
+        try {
+            const response = await fetch('/api/shorts/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, duration })
+            });
+            
+            if (!response.ok) throw new Error('Generation queue failed');
+            
+            Components.showToast('Short generation queued!', 'success');
+            // Terminal will auto-populate via existing log stream
+            
+        } catch (err) {
+            console.error("Submission error:", err);
+            Components.showToast(`Generation failed: ${err.message}`, 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Generate Short';
+            document.getElementById('shorts-form-container').style.display = 'block';
+            document.getElementById('shorts-monitor-panel').style.display = 'none';
         }
     },
 

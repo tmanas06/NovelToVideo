@@ -2,7 +2,7 @@ import sqlite3
 import aiosqlite
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from backend.config import get_settings
@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+
+def utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
 class Database:
     def __init__(self, db_path: Path = settings.database_path):
         self.db_path = db_path
@@ -18,6 +22,7 @@ class Database:
     async def init_db(self):
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA foreign_keys = ON")
             # Projects Table
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS projects (
@@ -92,7 +97,7 @@ def dict_factory(cursor, row):
 
 async def create_project(title: str, story_text: str, style: str = 'manga') -> Dict[str, Any]:
     project_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = utcnow()
     async with aiosqlite.connect(settings.database_path) as db:
         db.row_factory = dict_factory
         await db.execute(
@@ -119,7 +124,10 @@ async def list_projects() -> List[Dict[str, Any]]:
             return await cursor.fetchall()
 
 async def delete_project(project_id: str):
+    # PRAGMA foreign_keys is per-connection in SQLite; enable it here so
+    # ON DELETE CASCADE actually removes the project's scenes and jobs.
     async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("PRAGMA foreign_keys = ON")
         await db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         await db.commit()
 
@@ -127,7 +135,7 @@ async def update_project(project_id: str, **kwargs) -> Optional[Dict[str, Any]]:
     if not kwargs:
         return await get_project(project_id)
     
-    kwargs['updated_at'] = datetime.utcnow().isoformat()
+    kwargs['updated_at'] = utcnow()
     keys = list(kwargs.keys())
     values = list(kwargs.values())
     set_clause = ", ".join([f"{k} = ?" for k in keys])
@@ -173,7 +181,7 @@ async def update_scene(scene_id: str, **kwargs) -> Optional[Dict[str, Any]]:
 
 async def create_job(project_id: str, job_type: str = 'single') -> Dict[str, Any]:
     job_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = utcnow()
     async with aiosqlite.connect(settings.database_path) as db:
         db.row_factory = dict_factory
         await db.execute(
@@ -201,7 +209,7 @@ async def update_job(job_id: str, **kwargs) -> Optional[Dict[str, Any]]:
         return await get_job(job_id)
     
     if kwargs.get('status') in ['done', 'failed']:
-        kwargs['completed_at'] = datetime.utcnow().isoformat()
+        kwargs['completed_at'] = utcnow()
         
     keys = list(kwargs.keys())
     values = list(kwargs.values())

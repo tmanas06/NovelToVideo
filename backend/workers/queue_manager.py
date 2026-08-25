@@ -3,6 +3,7 @@ import threading
 import logging
 import traceback
 from queue import Queue, Empty
+from datetime import datetime, timezone
 import sqlite3
 from typing import Callable, Dict, List, Any
 from backend.database.db import update_job, append_job_log
@@ -136,7 +137,7 @@ class JobQueue:
                 logger.info(f"Worker thread starting job {job_id} for project {project_id}")
                 
                 # Update status to running
-                from datetime import datetime
+                now = datetime.now(timezone.utc).isoformat()
                 self._sync_db_update("UPDATE jobs SET status = 'running' WHERE id = ?", (job_id,))
                 self._sync_db_update("UPDATE projects SET status = 'generating' WHERE id = ?", (project_id,))
 
@@ -161,7 +162,7 @@ class JobQueue:
                     
                     # Complete
                     logger.info(f"Worker thread successfully finished job {job_id}")
-                    now = datetime.utcnow().isoformat()
+                    now = datetime.now(timezone.utc).isoformat()
                     self._sync_db_update("UPDATE jobs SET status = 'done', progress = 1.0, completed_at = ? WHERE id = ?", (now, job_id))
                     self._sync_db_update("UPDATE projects SET status = 'completed' WHERE id = ?", (project_id,))
                     self.emit_progress(job_id, "completed", 1.0, "Video generation pipeline finished successfully!")
@@ -174,7 +175,7 @@ class JobQueue:
                     from backend.config import get_settings
                     db_path = get_settings().database_path
                     with sqlite3.connect(db_path) as conn:
-                        now = datetime.utcnow().isoformat()
+                        now = datetime.now(timezone.utc).isoformat()
                         conn.execute(
                             "UPDATE jobs SET status = 'failed', error = ?, completed_at = ? WHERE id = ?",
                             (str(run_err), now, job_id)
@@ -186,11 +187,6 @@ class JobQueue:
                     
                 finally:
                     self._queue.task_done()
-                    
-            except Empty:
-                continue
-            except Exception as outer_err:
-                logger.error(f"Outer exception in worker loop: {outer_err}")
                     
             except Empty:
                 continue
