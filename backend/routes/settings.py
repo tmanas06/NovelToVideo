@@ -31,9 +31,17 @@ async def api_update_settings(updates: SettingsUpdate):
         with open(config_path, "w") as f:
             json.dump(merged_data, f, indent=2)
             
-        # Re-initialize the active settings instance
+        # Re-initialize the active settings instance.
+        # Mutate the existing singleton in place: many modules bind
+        # `settings = get_settings()` at import time, so replacing the
+        # object would leave them stale.
         import backend.config
-        backend.config._settings = Settings(**merged_data)
+        active = backend.config._settings
+        if active is None:
+            backend.config._settings = Settings(**merged_data)
+        else:
+            for key, value in merged_data.items():
+                setattr(active, key, value)
         
         return {"status": "success", "message": "Settings updated successfully", "data": merged_data}
     except Exception as e:

@@ -104,7 +104,8 @@ async def run_pipeline(project_id: str, job_id: str, progress_callback: Callable
             scenes=db_scenes,
             style=style,
             ollama_url=settings.ollama_url,
-            model=settings.ollama_model
+            model=settings.ollama_model,
+            story_text=story_text
         )
 
         # Update scenes with prompts in database
